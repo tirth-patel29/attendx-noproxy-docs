@@ -90,12 +90,12 @@ export default function DatabaseExplorerPage() {
                       {selectedTable.columns.map((col, idx) => (
                         <tr key={idx} className="hover:bg-muted/30 transition-colors">
                           <td className="p-2 font-mono font-medium flex items-center gap-2">
-                            {col.isPrimaryKey ? <span title="Primary Key" className="text-amber-500">🔑</span> : col.isForeignKey ? <span title="Foreign Key" className="text-indigo-500">🔗</span> : null}
+                            {col.key === 'PK' ? <span title="Primary Key" className="text-amber-500">🔑</span> : col.key === 'FK' ? <span title="Foreign Key" className="text-indigo-500">🔗</span> : null}
                             {col.name}
                           </td>
                           <td className="p-2 font-mono text-xs text-muted-foreground">{col.type}</td>
                           <td className="p-2 text-right">
-                            {col.isNullable && <span className="bg-muted text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">NULL</span>}
+                            {col.nullable && <span className="bg-muted text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">NULL</span>}
                           </td>
                         </tr>
                       ))}
@@ -110,19 +110,22 @@ export default function DatabaseExplorerPage() {
                   <Link2 size={14} /> Foreign Keys
                 </h3>
                 <div className="space-y-2">
-                  {selectedTable.columns.filter(c => c.isForeignKey).length === 0 && (
+                  {selectedTable.columns.filter(c => c.key === 'FK').length === 0 && (
                     <p className="text-sm text-muted-foreground italic">No outgoing foreign keys.</p>
                   )}
-                  {selectedTable.columns.filter(c => c.isForeignKey).map((col, idx) => (
-                    <div key={idx} className="text-sm flex flex-col gap-1 bg-background border border-border p-3 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-indigo-500">{selectedTable.name}.{col.name}</span>
+                  {selectedTable.columns.filter(c => c.key === 'FK' && c.references).map((col, idx) => {
+                    const [refTable, refCol] = col.references!.split('(');
+                    return (
+                      <div key={idx} className="text-sm flex flex-col gap-1 bg-background border border-border p-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-indigo-500">{selectedTable.name}.{col.name}</span>
+                        </div>
+                        <div className="text-muted-foreground">
+                          points to <span className="font-mono font-bold text-foreground">{refTable}.{refCol.replace(')', '')}</span>
+                        </div>
                       </div>
-                      <div className="text-muted-foreground">
-                        points to <span className="font-mono font-bold text-foreground">{col.referencesTable}.{col.referencesColumn}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 

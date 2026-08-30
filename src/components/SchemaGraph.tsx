@@ -10,6 +10,7 @@ import {
   Handle,
   Position,
   type Edge,
+  type Node as FlowNode,
   MarkerType
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -50,7 +51,7 @@ type SchemaGraphProps = {
 };
 
 export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphProps) {
-  const initialNodes: Node[] = useMemo(() => {
+  const initialNodes: FlowNode[] = useMemo(() => {
     return tables.map((t, idx) => ({
       id: t.name,
       type: 'tableNode',
@@ -62,13 +63,17 @@ export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphP
   const initialEdges = useMemo(() => {
     const edges: Edge[] = [];
     tables.forEach(table => {
-      table.columns.filter(c => c.isForeignKey && c.referencesTable).forEach(fk => {
-        const isSelectedEdge = selectedTable === table.name || selectedTable === fk.referencesTable;
+      table.columns.filter(c => c.key === 'FK' && c.references).forEach(fk => {
+        const [refTable, refCol] = fk.references!.split('(');
+        const refTableName = refTable.trim();
+        const refColName = refCol.replace(')', '').trim();
+        
+        const isSelectedEdge = selectedTable === table.name || selectedTable === refTableName;
         edges.push({
-          id: `e-${table.name}-${fk.referencesTable}`,
+          id: `e-${table.name}-${refTableName}`,
           source: table.name,
-          target: fk.referencesTable!,
-          label: `${fk.name} → ${fk.referencesColumn}`,
+          target: refTableName,
+          label: `${fk.name} → ${refColName}`,
           animated: isSelectedEdge,
           markerEnd: { type: MarkerType.ArrowClosed, color: isSelectedEdge ? '#3b82f6' : '#52525b' },
           style: { 
