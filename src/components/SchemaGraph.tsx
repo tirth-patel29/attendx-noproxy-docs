@@ -9,7 +9,8 @@ import {
   addEdge,
   Handle,
   Position,
-  type Edge
+  type Edge,
+  MarkerType
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { tables } from '../data/content/database';
@@ -60,22 +61,27 @@ export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphP
 
   const initialEdges = useMemo(() => {
     const edges: Edge[] = [];
-    tables.forEach(t => {
-      t.columns.forEach(c => {
-        if (c.key === 'FK' && c.references) {
-          const targetTable = c.references.split('(')[0];
-          edges.push({
-            id: `e-${t.name}-${c.name}-${targetTable}`,
-            source: targetTable,
-            target: t.name,
-            animated: true,
-            style: { stroke: '#3b82f6', strokeWidth: 2 },
-          });
-        }
+    tables.forEach(table => {
+      table.columns.filter(c => c.isForeignKey && c.referencesTable).forEach(fk => {
+        const isSelectedEdge = selectedTable === table.name || selectedTable === fk.referencesTable;
+        edges.push({
+          id: `e-${table.name}-${fk.referencesTable}`,
+          source: table.name,
+          target: fk.referencesTable!,
+          label: `${fk.name} → ${fk.referencesColumn}`,
+          animated: isSelectedEdge,
+          markerEnd: { type: MarkerType.ArrowClosed, color: isSelectedEdge ? '#3b82f6' : '#52525b' },
+          style: { 
+            stroke: isSelectedEdge ? '#3b82f6' : '#52525b', 
+            strokeWidth: isSelectedEdge ? 2 : 1 
+          },
+          labelStyle: { fill: isSelectedEdge ? '#3b82f6' : '#a1a1aa', fontWeight: 600, fontSize: 10 },
+          labelBgStyle: { fill: '#18181b', stroke: '#27272a' },
+        });
       });
     });
     return edges;
-  }, []);
+  }, [selectedTable]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -91,6 +97,23 @@ export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphP
       }))
     );
   }, [selectedTable, setNodes]);
+
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((e) => {
+        const isSelectedEdge = selectedTable === e.source || selectedTable === e.target;
+        return {
+          ...e,
+          animated: isSelectedEdge,
+          style: {
+            stroke: isSelectedEdge ? '#3b82f6' : '#52525b',
+            strokeWidth: isSelectedEdge ? 2 : 1
+          },
+          labelStyle: { fill: isSelectedEdge ? '#3b82f6' : '#a1a1aa', fontWeight: 600, fontSize: 10 },
+        };
+      })
+    );
+  }, [selectedTable, setEdges]);
 
   const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
