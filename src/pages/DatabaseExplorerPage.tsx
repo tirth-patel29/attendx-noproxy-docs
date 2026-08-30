@@ -2,24 +2,60 @@ import { tables } from '../data/content/database';
 import { apis } from '../data/content/generated-apis';
 import { migrations } from '../data/content/generated-migrations';
 import SchemaGraph from '../components/SchemaGraph';
-import { Database, Search, TableProperties, X, Link2, Terminal, GitBranch } from 'lucide-react';
-import { useState } from 'react';
+import { Database, Search, TableProperties, X, Link2, Terminal, GitBranch, LayoutGrid } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { ReactFlowProvider } from '@xyflow/react';
+
+type Mode = 'FULL' | 'ACADEMIC' | 'ATTENDANCE' | 'SECURITY';
 
 export default function DatabaseExplorerPage() {
   const [selectedTableName, setSelectedTableName] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const [mode, setMode] = useState<Mode>('FULL');
 
   const selectedTable = tables.find(t => t.name === selectedTableName);
 
-  // Find related APIs by checking if the table name is used in the API path or group
+  const modeFilters: Record<Mode, string[]> = {
+    FULL: tables.map(t => t.name),
+    ACADEMIC: ['colleges', 'departments', 'branches', 'divisions', 'batches', 'students'],
+    ATTENDANCE: ['students', 'courses', 'course_sessions', 'attendance_ledger', 'professors', 'teacher_assignments'],
+    SECURITY: ['devices', 'crypto_challenges', 'tokens', 'api_keys', 'users', 'auth_logs']
+  };
+
+  const tablesToRender = useMemo(() => {
+    return tables.filter(t => modeFilters[mode].includes(t.name));
+  }, [mode]);
+
+  // Handle '0' key for reset (focuses on nothing, fit is handled by the graph when mode changes)
+  // Handle 'f' key for focus selected
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in search
+      if (document.activeElement?.tagName === 'INPUT') return;
+      
+      if (e.key === '0') {
+        setSelectedTableName(undefined);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Find related APIs
   const relatedApis = selectedTable ? apis.filter(api => 
-    api.path.includes(selectedTable.name.replace(/s$/, '')) || // match singular
+    api.path.includes(selectedTable.name.replace(/s$/, '')) || 
     api.group.includes(selectedTable.name.replace(/s$/, '')) ||
     api.path.includes(selectedTable.name)
   ) : [];
 
-  // Find migration that created this table
-  const createdByMigration = selectedTable ? migrations.find(m => m.createdTables.includes(selectedTable.name)) : undefined;
+  // Find migrations
+  const createdByMigrationIndex = selectedTable ? migrations.findIndex(m => m.createdTables.includes(selectedTable.name)) : -1;
+  const createdByMigration = createdByMigrationIndex >= 0 ? migrations[createdByMigrationIndex] : undefined;
+  
+  // This is a naive heuristic for "modified by" based on later migrations affecting the same table.
+  const modifiedByMigrations = selectedTable && createdByMigrationIndex >= 0
+    ? migrations.filter((m, idx) => idx > createdByMigrationIndex && (m.insertedTables.includes(selectedTable.name) || m.file.includes(selectedTable.name)))
+    : [];
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
@@ -31,43 +67,63 @@ export default function DatabaseExplorerPage() {
           <p className="text-muted-foreground">Interactive schema diagram driven by actual Postgres migrations.</p>
         </div>
         
-        <div className="relative w-64">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Search tables..." 
-            className="w-full bg-card border border-border rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
-              {tables.filter(t => t.name.includes(searchQuery.toLowerCase())).map(t => (
-                <button 
-                  key={t.name}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center gap-2"
-                  onClick={() => {
-                    setSelectedTableName(t.name);
-                    setSearchQuery('');
-                  }}
-                >
-                  <TableProperties size={14} className="text-emerald-500" /> {t.name}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="flex items-center gap-4">
+          <div className="flex bg-muted/50 p-1 rounded-lg border border-border">
+            {(['FULL', 'ACADEMIC', 'ATTENDANCE', 'SECURITY'] as Mode[]).map(m => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${mode === m ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          
+          <div className="relative w-64">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input 
+              type="text" 
+              placeholder="Search tables..." 
+              className="w-full bg-card border border-border rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex flex-1 gap-6 min-h-0 relative">
+        {/* Left Navigation Sidebar */}
+        <div className="w-64 border border-border rounded-xl bg-card overflow-y-auto flex-shrink-0 flex flex-col hidden lg:flex">
+          <div className="p-4 border-b border-border bg-muted/50 sticky top-0 z-10 flex items-center gap-2">
+            <LayoutGrid size={16} className="text-muted-foreground" />
+            <h2 className="font-bold text-sm tracking-wider">TABLES ({tablesToRender.length})</h2>
+          </div>
+          <div className="p-2 space-y-1">
+            {tablesToRender.filter(t => t.name.includes(searchQuery.toLowerCase())).map(t => (
+              <button 
+                key={t.name}
+                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center gap-2 ${selectedTableName === t.name ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setSelectedTableName(t.name)}
+              >
+                <TableProperties size={14} className={selectedTableName === t.name ? 'text-primary' : 'text-muted-foreground'} />
+                <span className="truncate">{t.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Graph Area */}
         <div className="flex-1 border border-border rounded-xl bg-card overflow-hidden relative">
-          <SchemaGraph onNodeClick={setSelectedTableName} selectedTable={selectedTableName} />
+          <ReactFlowProvider>
+            <SchemaGraph onNodeClick={setSelectedTableName} selectedTable={selectedTableName} tablesToRender={tablesToRender} />
+          </ReactFlowProvider>
         </div>
 
         {/* Inspector Panel */}
         {selectedTable && (
-          <div className="w-96 border border-border rounded-xl bg-card overflow-y-auto flex-shrink-0 animate-in slide-in-from-right-8 shadow-xl flex flex-col">
+          <div className="w-[400px] border border-border rounded-xl bg-card overflow-y-auto flex-shrink-0 animate-in slide-in-from-right-8 shadow-xl flex flex-col">
             {/* Header */}
             <div className="p-4 border-b border-border bg-muted/50 sticky top-0 z-10 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -140,7 +196,7 @@ export default function DatabaseExplorerPage() {
                   )}
                   {relatedApis.map((api, idx) => (
                     <div key={idx} className="bg-background border border-border p-2 rounded-md flex items-center gap-3">
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border w-12 text-center ${
+                      <span className={`flex-shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border w-12 text-center ${
                         api.method === 'GET' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
                         api.method === 'POST' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                         api.method === 'DELETE' ? 'bg-rose-500/10 text-rose-600 border-rose-500/20' :
@@ -148,7 +204,7 @@ export default function DatabaseExplorerPage() {
                       }`}>
                         {api.method}
                       </span>
-                      <code className="font-mono text-xs truncate" title={api.path}>{api.path}</code>
+                      <code className="font-mono text-[10px] break-all leading-tight" title={api.path}>{api.path}</code>
                     </div>
                   ))}
                 </div>
@@ -157,16 +213,35 @@ export default function DatabaseExplorerPage() {
               {/* Created By Migration */}
               <section>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-1 flex items-center gap-2">
-                  <GitBranch size={14} /> Migration Lineage
+                  <GitBranch size={14} /> Migration History
                 </h3>
-                {createdByMigration ? (
-                  <div className="bg-background border border-border p-3 rounded-lg">
-                    <div className="font-mono text-xs font-bold mb-1">{createdByMigration.file}</div>
-                    <div className="text-sm text-muted-foreground capitalize">{createdByMigration.purpose}</div>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Created By</h4>
+                    {createdByMigration ? (
+                      <div className="bg-background border border-border p-3 rounded-lg">
+                        <div className="font-mono text-xs font-bold mb-1 text-emerald-500">{createdByMigration.file}</div>
+                        <div className="text-sm text-muted-foreground capitalize">{createdByMigration.purpose}</div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Migration file not resolved.</p>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">Migration file not resolved.</p>
-                )}
+                  
+                  {modifiedByMigrations.length > 0 && (
+                    <div>
+                      <h4 className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Later Modifications</h4>
+                      <div className="space-y-2">
+                        {modifiedByMigrations.map(m => (
+                          <div key={m.file} className="bg-background border border-border p-3 rounded-lg">
+                            <div className="font-mono text-xs font-bold mb-1 text-blue-500">{m.file}</div>
+                            <div className="text-xs text-muted-foreground capitalize">{m.purpose}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </section>
 
             </div>

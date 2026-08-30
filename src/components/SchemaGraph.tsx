@@ -7,69 +7,87 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  Handle,
-  Position,
   type Edge,
   type Node as FlowNode,
-  MarkerType
+  MarkerType,
+  useReactFlow
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { tables } from '../data/content/database';
-import { Key } from 'lucide-react';
-
-const TableNode = ({ data }: any) => {
-  return (
-    <div className="bg-card border border-border rounded-lg shadow-lg overflow-hidden w-64 font-sans text-sm">
-      <div className="bg-muted/80 p-2 font-bold border-b border-border text-foreground flex justify-between items-center">
-        {data.label}
-        <span className="text-[10px] font-normal bg-background px-1.5 py-0.5 rounded border border-border text-muted-foreground">{data.columns.length} cols</span>
-      </div>
-      <div className="p-0">
-        {data.columns.map((col: any) => (
-          <div key={col.name} className="flex justify-between items-center py-1.5 px-2 border-b border-border last:border-b-0 hover:bg-muted/30">
-            <div className="flex items-center gap-1.5 font-mono text-xs">
-              {col.key === 'PK' ? <Key size={12} className="text-amber-500" /> : col.key === 'FK' ? <Key size={12} className="text-blue-500" /> : <div className="w-3" />}
-              <span className={col.key === 'PK' ? 'font-bold' : ''}>{col.name}</span>
-            </div>
-            <span className="text-[10px] font-mono text-muted-foreground">{col.type}</span>
-          </div>
-        ))}
-      </div>
-      <Handle type="target" position={Position.Left} className="w-2 h-2 rounded-full bg-blue-500" />
-      <Handle type="source" position={Position.Right} className="w-2 h-2 rounded-full bg-blue-500" />
-    </div>
-  );
-};
+import TableNode from './TableNode';
+import dagre from 'dagre';
+import type { DatabaseTable } from '../data/models';
 
 const nodeTypes = {
   tableNode: TableNode,
 };
 
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedElements = (nodes: FlowNode[], edges: Edge[], direction = 'TB') => {
+  dagreGraph.setGraph({ rankdir: direction, nodesep: 100, ranksep: 200 });
+
+  nodes.forEach((node) => {
+    // We are estimating the size of the node here because dagre needs it.
+    // TableNode width is roughly 288px (w-72) and height depends on columns.
+    const tableData = node.data.table as DatabaseTable;
+    const height = 48 + (tableData.columns.length * 32); 
+    dagreGraph.setNode(node.id, { width: 288, height });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    const newNode = { ...node };
+
+    // We are shifting the dagre node position (anchor=center center) to the top left
+    // so it matches the React Flow node anchor point (top left).
+    newNode.position = {
+      x: nodeWithPosition.x - nodeWithPosition.width / 2,
+      y: nodeWithPosition.y - nodeWithPosition.height / 2,
+    };
+
+    return newNode;
+  });
+
+  return { nodes: newNodes, edges };
+};
+
 type SchemaGraphProps = {
   onNodeClick?: (tableName: string) => void;
   selectedTable?: string;
+  tablesToRender?: DatabaseTable[];
 };
 
-export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphProps) {
-  const initialNodes: FlowNode[] = useMemo(() => {
-    return tables.map((t, idx) => ({
+export default function SchemaGraph({ onNodeClick, selectedTable, tablesToRender = tables }: SchemaGraphProps) {
+  const { fitView } = useReactFlow();
+
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    const nds: FlowNode[] = tablesToRender.map((t) => ({
       id: t.name,
       type: 'tableNode',
-      position: { x: (idx % 4) * 350, y: Math.floor(idx / 4) * 300 },
+      position: { x: 0, y: 0 },
       data: { table: t, isSelected: t.name === selectedTable },
     }));
-  }, [selectedTable]);
 
-  const initialEdges = useMemo(() => {
-    const edges: Edge[] = [];
-    tables.forEach(table => {
+    const eds: Edge[] = [];
+    tablesToRender.forEach(table => {
       table.columns.filter(c => c.key === 'FK' && c.references).forEach(fk => {
         const [refTable, refCol] = fk.references!.split('(');
         const refTableName = refTable.trim();
         const refColName = refCol.replace(')', '').trim();
         
+        // Only create edge if the target table is actually in the rendered list
+        if (!tablesToRender.find(t => t.name === refTableName)) return;
+
         const isSelectedEdge = selectedTable === table.name || selectedTable === refTableName;
-        edges.push({
+        eds.push({
           id: `e-${table.name}-${refTableName}`,
           source: table.name,
           target: refTableName,
@@ -85,45 +103,27 @@ export default function SchemaGraph({ onNodeClick, selectedTable }: SchemaGraphP
         });
       });
     });
-    return edges;
-  }, [selectedTable]);
+
+    return getLayoutedElements(nds, eds);
+  }, [tablesToRender, selectedTable]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  // Sync when mode changes or table selection changes
   useEffect(() => {
-    setNodes((nds) => 
-      nds.map((n) => ({
-        ...n,
-        data: {
-          ...n.data,
-          isSelected: n.id === selectedTable
-        }
-      }))
-    );
-  }, [selectedTable, setNodes]);
-
-  useEffect(() => {
-    setEdges((eds) =>
-      eds.map((e) => {
-        const isSelectedEdge = selectedTable === e.source || selectedTable === e.target;
-        return {
-          ...e,
-          animated: isSelectedEdge,
-          style: {
-            stroke: isSelectedEdge ? '#3b82f6' : '#52525b',
-            strokeWidth: isSelectedEdge ? 2 : 1
-          },
-          labelStyle: { fill: isSelectedEdge ? '#3b82f6' : '#a1a1aa', fontWeight: 600, fontSize: 10 },
-        };
-      })
-    );
-  }, [selectedTable, setEdges]);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
+    setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
+    
+    // Fit view after a small delay to allow nodes to render
+    setTimeout(() => fitView({ padding: 0.2, duration: 500 }), 50);
+  }, [initialNodes, initialEdges, setNodes, setEdges, fitView]);
 
   const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
   return (
-    <div className="w-full h-full bg-background/50 border border-border rounded-lg overflow-hidden">
+    <div className="w-full h-full bg-background/50 overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
