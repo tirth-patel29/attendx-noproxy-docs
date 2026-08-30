@@ -1,6 +1,10 @@
 import { ArrowRight, Server, Shield, Smartphone, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { tables } from '../data/content/database';
+import { apis } from '../data/content/generated-apis';
+import { apps } from '../data/content/generated-apps';
+
 export default function Dashboard() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -12,15 +16,15 @@ export default function Dashboard() {
       {/* Status Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Backend API", value: "api.atmyhome.tech", status: "Production" },
-          { label: "Teacher Portal", value: "portal.atmyhome.tech", status: "Production" },
-          { label: "Admin Portal", value: "admin.atmyhome.tech", status: "Production" },
-          { label: "Database", value: "supabase.atmyhome.tech", status: "Production" }
+          { label: "Backend APIs", value: apis.length, status: "Analyzed" },
+          { label: "Database Tables", value: tables.length, status: "Mapped" },
+          { label: "Frontend Applications", value: apps.length, status: "Audited" },
+          { label: "Architecture Gates", value: "4", status: "Verified" }
         ].map(stat => (
           <div key={stat.label} className="p-4 rounded-xl border border-border bg-card shadow-sm flex flex-col gap-1 relative overflow-hidden group hover:border-primary/50 transition-colors">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{stat.label}</span>
-            <span className="font-mono text-sm font-medium">{stat.value}</span>
+            <span className="font-mono text-xl font-bold">{stat.value}</span>
             <div className="flex items-center gap-1.5 mt-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{stat.status}</span>

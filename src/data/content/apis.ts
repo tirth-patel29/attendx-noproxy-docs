@@ -1,6 +1,6 @@
-import type { ApiEndpoint } from '../models';
+import type { ApiEndpointDetailed } from '../models';
 
-export const apis: ApiEndpoint[] = [
+export const apis: ApiEndpointDetailed[] = [
   {
     method: 'POST',
     path: '/api/v1/student/device/bind',

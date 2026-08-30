@@ -28,7 +28,7 @@ export type ResponseExample = {
   body?: string;
 };
 
-export type ApiEndpoint = {
+export type ApiEndpointDetailed = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
   purpose: string;
@@ -37,6 +37,28 @@ export type ApiEndpoint = {
   responses: ResponseExample[];
   relatedTables?: string[];
   sourceFile?: string;
+};
+
+export type ApiEndpoint = {
+  method: string;
+  path: string;
+  group: string;
+  security: string;
+  file: string;
+};
+
+export type AppPage = {
+  name: string;
+  path: string;
+  purpose: string;
+};
+
+export type AppApp = {
+  name: string;
+  techStack: string;
+  purpose: string;
+  url: string;
+  pages: AppPage[];
 };
 
 export type ArchitectureNode = {

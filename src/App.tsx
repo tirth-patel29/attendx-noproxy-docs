@@ -1,12 +1,19 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Search, Moon, Sun, BookOpen, Database, Shield, LayoutDashboard, Terminal, Code } from 'lucide-react';
+import { Search, Moon, Sun, BookOpen, Database, Shield, LayoutDashboard, Terminal, Code, Users2, LockKeyhole, GitBranch, AppWindow, Cloud, Code2 } from 'lucide-react';
 import { useState } from 'react';
 
-// Pages
 import Dashboard from './pages/Dashboard';
 import DatabaseExplorerPage from './pages/DatabaseExplorerPage';
 import ApiReferencePage from './pages/ApiReferencePage';
 import ArchitecturePage from './pages/ArchitecturePage';
+import AcademicHierarchyPage from './pages/AcademicHierarchyPage';
+import SecurityPage from './pages/SecurityPage';
+import MigrationExplorerPage from './pages/MigrationExplorerPage';
+import ApplicationsPage from './pages/ApplicationsPage';
+import AttendanceEnginePage from './pages/AttendanceEnginePage';
+import DeploymentPage from './pages/DeploymentPage';
+import DevelopmentPage from './pages/DevelopmentPage';
+import CommandPalette from './components/CommandPalette';
 
 const SidebarLink = ({ to, icon: Icon, children }: { to: string, icon: any, children: React.ReactNode }) => {
   const location = useLocation();
@@ -24,6 +31,7 @@ const SidebarLink = ({ to, icon: Icon, children }: { to: string, icon: any, chil
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div className={`min-h-screen ${darkMode ? 'dark' : ''}`}>
@@ -41,18 +49,31 @@ export default function App() {
             </div>
           </div>
           
-          <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
-            <div className="mb-6">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">Overview</h2>
+          <nav className="p-4 flex-1 space-y-6 overflow-y-auto">
+            <div className="space-y-1">
               <SidebarLink to="/" icon={LayoutDashboard}>Dashboard</SidebarLink>
+            </div>
+
+            <div className="space-y-1">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Engineering</div>
               <SidebarLink to="/architecture" icon={BookOpen}>Architecture</SidebarLink>
+              <SidebarLink to="/security" icon={Shield}>Security Gates</SidebarLink>
+              <SidebarLink to="/engine" icon={LockKeyhole}>Attendance Engine</SidebarLink>
+            </div>
+
+            <div className="space-y-1">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Explorers</div>
+              <SidebarLink to="/database" icon={Database}>Database & Schema</SidebarLink>
+              <SidebarLink to="/migrations" icon={GitBranch}>Migration Timeline</SidebarLink>
+              <SidebarLink to="/api" icon={Terminal}>API Reference</SidebarLink>
+              <SidebarLink to="/hierarchy" icon={Users2}>Academic Hierarchy</SidebarLink>
+              <SidebarLink to="/apps" icon={AppWindow}>Applications</SidebarLink>
             </div>
             
-            <div className="mb-6">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">Deep Dives</h2>
-              <SidebarLink to="/database" icon={Database}>Database & Models</SidebarLink>
-              <SidebarLink to="/api" icon={Terminal}>API Reference</SidebarLink>
-              <SidebarLink to="/security" icon={Shield}>Security Gates</SidebarLink>
+            <div className="space-y-1">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">DevOps</div>
+              <SidebarLink to="/deployment" icon={Cloud}>Deployment</SidebarLink>
+              <SidebarLink to="/development" icon={Code2}>Development</SidebarLink>
             </div>
           </nav>
         </aside>
@@ -62,7 +83,10 @@ export default function App() {
           {/* Topbar */}
           <header className="h-14 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-6">
             <div className="flex items-center gap-4 flex-1">
-              <button className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm text-muted-foreground border border-border hover:bg-muted/80 w-64 justify-between transition-colors">
+              <button 
+                onClick={() => setSearchOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm text-muted-foreground border border-border hover:bg-muted/80 w-64 justify-between transition-colors"
+              >
                 <span className="flex items-center gap-2"><Search size={14} /> Search docs...</span>
                 <span className="text-xs border border-border rounded px-1.5 py-0.5">⌘K</span>
               </button>
@@ -83,13 +107,20 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/architecture" element={<ArchitecturePage />} />
               <Route path="/database" element={<DatabaseExplorerPage />} />
+              <Route path="/migrations" element={<MigrationExplorerPage />} />
               <Route path="/api" element={<ApiReferencePage />} />
-              <Route path="/security" element={<div className="text-xl font-bold">Security (To be built)</div>} />
+              <Route path="/hierarchy" element={<AcademicHierarchyPage />} />
+              <Route path="/apps" element={<ApplicationsPage />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/engine" element={<AttendanceEnginePage />} />
+              <Route path="/deployment" element={<DeploymentPage />} />
+              <Route path="/development" element={<DevelopmentPage />} />
             </Routes>
           </div>
         </main>
-
       </div>
+      
+      <CommandPalette isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }
